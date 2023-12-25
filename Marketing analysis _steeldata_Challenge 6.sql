@@ -8,57 +8,133 @@ CREATE DATABASE Marketing_Analysis;
 
 -- Switch to the newly created database
 USE Marketing_Analysis;
-
-select * from marketing_campaigns;
-select * from sustainable_clothing;
-select * from transactions;
-
--- Q1.How many transactions were completed during each marketing campaign?
-
+-- Q1. How many transactions were completed during each marketing campaign?
 SELECT 
-    transaction_id,
-    c.campaign_name,
-    c.product_id,
-    COUNT(quantity) AS transactions_count
+    t.transaction_id,  
+    c.campaign_name,  
+    c.product_id,     
+    COUNT(t.quantity) AS transactions_count  -- Counting the number of transactions for each campaign
 FROM
     marketing_campaigns AS c
-        INNER JOIN
-    transactions AS t USING (product_id)
-GROUP BY c.campaign_id , c.campaign_name;
+INNER JOIN
+    transactions AS t ON c.product_id = t.product_id  
+GROUP BY c.campaign_id, c.campaign_name;  
 
--- Q2.Which product had the highest sales quantity?
+-- Q2. Which product had the highest sales quantity?
 SELECT 
-    product_id, product_name, SUM(quantity) AS total_quantity
-FROM
-    sustainable_clothing
-        INNER JOIN
-    transactions AS t USING (product_id)
-GROUP BY product_name
-ORDER BY total_quantity DESC
-LIMIT 1;
-
--- Q3 What is the total revenue generated from each marketing campaign?
-
-SELECT 
-    m.campaign_id,
-    m.campaign_name,
-    round(sum(s.price * t.quantity),3) AS revenue
+    s.product_id,      
+    s.product_name,    
+    SUM(t.quantity) AS total_quantity  -- Summing up the quantity sold for each product
 FROM
     sustainable_clothing AS s
-        INNER JOIN
-    transactions AS t USING (product_id)
-        INNER JOIN
-    marketing_campaigns AS m USING (product_id)
-GROUP BY m.campaign_name;
+INNER JOIN
+    transactions AS t ON s.product_id = t.product_id  
+GROUP BY s.product_id, s.product_name  
+ORDER BY total_quantity DESC  
+LIMIT 1;  -- Limiting the result to the top row
 
--- Q4.4. What is the top-selling product category based on the total revenue generated?
+-- Q3. What is the total revenue generated from each marketing campaign?
 SELECT 
-    ROUND(SUM(s.price * t.quantity), 3) AS revenue, s.category
+    m.campaign_id,  
+    m.campaign_name, 
+    ROUND(SUM(s.price * t.quantity), 3) AS revenue  -- Calculating and rounding the total revenue for each campaign
 FROM
     sustainable_clothing AS s
-        INNER JOIN
-    transactions AS t USING (product_id)
-GROUP BY s.category
-ORDER BY revenue DESC
-LIMIT 1;
+INNER JOIN
+    transactions AS t ON s.product_id = t.product_id
+INNER JOIN
+    marketing_campaigns AS m ON m.product_id = t.product_id  
+GROUP BY m.campaign_id, m.campaign_name;  
 
+-- Q4. What is the top-selling product category based on the total revenue generated?
+SELECT 
+    ROUND(SUM(s.price * t.quantity), 3) AS revenue,  -- Calculating and rounding the total revenue for each category
+    s.category  
+FROM
+    sustainable_clothing AS s
+INNER JOIN
+    transactions AS t ON s.product_id = t.product_id  
+GROUP BY s.category  
+ORDER BY revenue DESC 
+LIMIT 1;  
+
+-- Q5. Which products had a higher quantity sold compared to the average quantity sold?
+SELECT
+    s.product_name,  
+    SUM(t.quantity) as sold_quantity    
+FROM
+    sustainable_clothing AS s
+JOIN transactions AS t ON s.product_id = t.product_id  
+GROUP BY s.product_name  
+HAVING SUM(t.quantity) > (SELECT AVG(quantity) FROM transactions)  -- Filtering products with quantity sold higher than average
+ORDER BY sold_quantity DESC  
+LIMIT 5;  -- Limiting the result to the top 5 rows
+
+-- Q6. What is the average revenue generated per day during the marketing campaigns?
+SELECT
+    mc.campaign_id,  -- Selecting the campaign ID
+    mc.campaign_name,  -- Selecting the campaign name
+    ROUND(AVG(t.quantity * sc.price), 2) AS average_revenue_per_day  -- Calculating and rounding the average revenue per day for each campaign
+FROM
+    transactions AS t
+JOIN
+    sustainable_clothing AS sc ON t.product_id = sc.product_id
+JOIN
+    marketing_campaigns AS mc ON t.product_id = mc.product_id
+WHERE
+    t.purchase_date BETWEEN mc.start_date AND mc.end_date  -- Filtering transactions within the campaign dates
+GROUP BY mc.campaign_id, mc.campaign_name  -- Grouping the result by campaign ID and campaign name
+ORDER BY mc.campaign_id;  
+
+-- Q7. What is the percentage contribution of each product to the total revenue?
+SELECT 
+    s.product_id,
+    s.product_name,
+    ROUND((SUM(s.price * t.quantity) / (SELECT SUM(s.price * t.quantity)
+        FROM sustainable_clothing AS s
+		INNER JOIN transactions AS t ON s.product_id = t.product_id)) * 100, 2) AS percentage_contribution
+FROM
+    sustainable_clothing AS s
+INNER JOIN
+    transactions AS t ON s.product_id = t.product_id
+GROUP BY s.product_id , s.product_name
+ORDER BY percentage_contribution DESC;
+
+
+-- Q8. Compare the average quantity sold during marketing campaigns to outside the marketing campaigns
+SELECT
+    CASE
+        WHEN t.purchase_date BETWEEN m.start_date AND m.end_date THEN 'During Campaign'  -- Checking if the transaction is within the campaign dates
+        ELSE 'Outside Campaign'
+    END AS period,  -- Creating a period column
+    AVG(t.quantity) AS avg_quantity_sold  
+FROM
+    transactions AS t
+LEFT JOIN
+    marketing_campaigns AS m ON t.product_id = m.product_id  
+GROUP BY period;  -- Grouping the result by period
+
+-- Q9. Compare the revenue generated by products inside the marketing campaigns to outside the campaigns
+SELECT
+    CASE
+        WHEN t.product_id IN (SELECT product_id FROM marketing_campaigns) THEN 'During Campaigns'
+        ELSE 'Outside Campaigns'
+    END AS campaign,
+    SUM(t.quantity * sc.price) AS total_revenue
+FROM
+    transactions AS t
+JOIN
+    sustainable_clothing AS sc ON t.product_id = sc.product_id
+GROUP BY campaign
+ORDER BY campaign;
+  
+
+-- Q10. Rank the products by their average daily quantity sold 
+SELECT
+    t.product_id,  
+    AVG(t.quantity) AS avg_daily_quantity_sold, 
+    DENSE_RANK() OVER (ORDER BY AVG(t.quantity) DESC) AS product_rank  -- Assigning a dense rank based on average daily quantity sold
+FROM
+    transactions AS t 
+GROUP BY t.product_id  -- Grouping the result by product ID
+ORDER BY avg_daily_quantity_sold DESC;  -- Sorting the result by average daily quantity sold in descending order

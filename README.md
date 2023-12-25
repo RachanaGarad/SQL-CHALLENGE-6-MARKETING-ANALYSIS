@@ -5,6 +5,8 @@ INTRO You are a Marketing Analyst. The 'Sustainable Clothing Co.' have been runn
 
 TABLES Here are the tables you will be using ![image](https://github.com/RachanaGarad/SQL-CHALLENGE-6-MARKETING-ANALYSIS/assets/154038081/1ade3131-fa5b-4e25-ac3c-8e62f0fde534)
 
+Database:https://www.steeldata.org.uk/sql6.html
+
 QUESTIONS
 
 1. How many transactions were completed during each marketing campaign?
